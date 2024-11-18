@@ -1,32 +1,31 @@
-const apiUrl =
-  "https://book-ease-73f27-default-rtdb.firebaseio.com/confomebooking.json";
-const container = document.getElementById("page-container");
+const apiUrl = "https://book-ease-73f27-default-rtdb.firebaseio.com/confomebooking.json";
+const container = document.getElementById("appointments-container");
+const sortSelect = document.getElementById("sort-appointments");
 
-// Fetch and render appointments
+let appointmentsData = {}; // Store fetched data globally for sorting
+
+// Fetch appointments
 const fetchAppointments = async () => {
   try {
     const response = await fetch(apiUrl);
     const data = await response.json();
-
     if (data) {
-      renderAppointments(data);
+      appointmentsData = data; // Store the fetched data globally
+      renderAppointments(data); // Render initial appointments
     } else {
       container.innerHTML = '<p class="text-center">No appointments found.</p>';
     }
   } catch (error) {
     console.error("Error fetching appointments:", error);
-    container.innerHTML =
-      '<p class="text-center text-danger">Failed to fetch appointments. Try again later.</p>';
+    container.innerHTML = '<p class="text-center text-danger">Failed to fetch appointments. Try again later.</p>';
   }
 };
 
-// Render appointments as Bootstrap cards
+// Render appointments
 const renderAppointments = (appointments) => {
   container.innerHTML = "";
 
-  Object.keys(appointments).forEach((key) => {
-    const appointment = appointments[key];
-
+  Object.entries(appointments).forEach(([key, appointment]) => {
     const card = document.createElement("div");
     card.classList.add("card", "mb-4", "shadow-sm");
     card.innerHTML = `
@@ -47,25 +46,34 @@ const renderAppointments = (appointments) => {
         </div>
       </div>
     `;
-
     container.appendChild(card);
   });
 
   attachDeleteListeners();
 };
 
-// Attach delete event listeners
-const attachDeleteListeners = () => {
-  const cancelButtons = document.querySelectorAll(".cancel-btn");
+// Sorting appointments
+const sortAppointments = (sortBy) => {
+  let sortedEntries = Object.entries(appointmentsData);
 
-  cancelButtons.forEach((button) => {
+  if (sortBy === "date") {
+    sortedEntries = sortedEntries.sort(([, a], [, b]) => new Date(a.date) - new Date(b.date));
+  } else if (sortBy === "time") {
+    sortedEntries = sortedEntries.sort(([, a], [, b]) => a.time.localeCompare(b.time));
+  } else if (sortBy === "category") {
+    sortedEntries = sortedEntries.sort(([, a], [, b]) => a.category.localeCompare(b.category));
+  }
+
+  const sortedAppointments = Object.fromEntries(sortedEntries);
+  renderAppointments(sortedAppointments);
+};
+
+// Attach delete listeners
+const attachDeleteListeners = () => {
+  document.querySelectorAll(".cancel-btn").forEach((button) => {
     button.addEventListener("click", async (e) => {
       const appointmentId = e.target.dataset.id;
-
-      const confirmDelete = confirm(
-        "Are you sure you want to cancel this appointment?"
-      );
-      if (confirmDelete) {
+      if (confirm("Are you sure you want to cancel this appointment?")) {
         await deleteAppointment(appointmentId);
       }
     });
@@ -75,10 +83,7 @@ const attachDeleteListeners = () => {
 // Delete appointment
 const deleteAppointment = async (id) => {
   try {
-    const response = await fetch(`${apiUrl.replace(".json", `/${id}.json`)}`, {
-      method: "DELETE",
-    });
-
+    const response = await fetch(`${apiUrl.replace(".json", `/${id}.json`)}`, { method: "DELETE" });
     if (response.ok) {
       alert("Appointment cancelled successfully.");
       fetchAppointments(); // Refresh the list
@@ -90,6 +95,16 @@ const deleteAppointment = async (id) => {
     alert("An error occurred. Please try again.");
   }
 };
+
+// Listen for sorting changes
+sortSelect.addEventListener("change", (e) => {
+  const sortBy = e.target.value;
+  if (sortBy) {
+    sortAppointments(sortBy);
+  } else {
+    renderAppointments(appointmentsData); // Default render when no sort option is selected
+  }
+});
 
 // Fetch appointments on page load
 document.addEventListener("DOMContentLoaded", fetchAppointments);
